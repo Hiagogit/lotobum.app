@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-white antialiased;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card border border-white/10 rounded-2xl shadow-xl;
+    backdrop-filter: blur(20px);
+  }
+
+  .number-ball {
+    @apply w-12 h-12 rounded-full flex items-center justify-center font-bold text-black;
+    background: linear-gradient(135deg, #30D158 0%, #248A3D 100%);
+  }
+
+  .btn-primary {
+    @apply bg-luck-green text-black font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-opacity;
+  }
+
+  .btn-secondary {
+    @apply bg-card text-white font-semibold px-6 py-3 rounded-full border border-white/20 hover:bg-white/10 transition-colors;
+  }
+}
