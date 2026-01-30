@@ -38,12 +38,18 @@ const generateNumbers = (count: number, max: number): number[] => {
 };
 
 // Health check
-app.get('/api', (req, res) => {
-  res.json({ status: 'ok', message: 'Loto Bum API' });
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'Loto Bum API', version: 'v1' });
 });
 
-// POST /api/games/generate
-app.post('/api/games/generate', (req, res) => {
+app.get('/api', (req, res) => {
+  res.json({ status: 'ok', message: 'Loto Bum API', version: 'v1' });
+});
+
+// Games routes - suporta /api/games e /v1/api/games
+const gamesRouter = express.Router();
+
+gamesRouter.post('/generate', (req, res) => {
   const { gameType } = req.body;
   const config = loteriasConfig[gameType];
   if (!config) {
@@ -53,8 +59,7 @@ app.post('/api/games/generate', (req, res) => {
   res.json({ gameType, numbers, generatedAt: new Date().toISOString() });
 });
 
-// POST /api/games/save
-app.post('/api/games/save', async (req, res) => {
+gamesRouter.post('/save', async (req, res) => {
   const { gameType, numbers } = req.body;
 
   if (!gameType || !numbers || !Array.isArray(numbers)) {
@@ -74,43 +79,51 @@ app.post('/api/games/save', async (req, res) => {
     });
   }
 
-  const { data, error } = await supabase
-    .from('saved_games')
-    .insert({ game_type: gameType, numbers })
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('saved_games')
+      .insert({ game_type: gameType, numbers })
+      .select()
+      .single();
 
-  if (error) {
-    console.error('Supabase error:', error);
-    return res.status(500).json({ error: 'Erro ao salvar jogo' });
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({ error: 'Erro ao salvar jogo' });
+    }
+
+    res.json({ success: true, game: data });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Erro interno' });
   }
-
-  res.json({ success: true, game: data });
 });
 
-// GET /api/games/history
-app.get('/api/games/history', async (req, res) => {
+gamesRouter.get('/history', async (req, res) => {
   const supabase = getSupabaseClient();
   if (!supabase) {
     return res.json({ games: [] });
   }
 
-  const { data, error } = await supabase
-    .from('saved_games')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(100);
+  try {
+    const { data, error } = await supabase
+      .from('saved_games')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
 
-  if (error) {
-    console.error('Supabase error:', error);
-    return res.status(500).json({ error: 'Erro ao buscar historico' });
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({ error: 'Erro ao buscar historico' });
+    }
+
+    res.json({ games: data || [] });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Erro interno' });
   }
-
-  res.json({ games: data || [] });
 });
 
-// DELETE /api/games/:id
-app.delete('/api/games/:id', async (req, res) => {
+gamesRouter.delete('/:id', async (req, res) => {
   const { id } = req.params;
 
   const supabase = getSupabaseClient();
@@ -118,14 +131,28 @@ app.delete('/api/games/:id', async (req, res) => {
     return res.json({ success: true, message: 'Supabase nao configurado' });
   }
 
-  const { error } = await supabase.from('saved_games').delete().eq('id', id);
+  try {
+    const { error } = await supabase.from('saved_games').delete().eq('id', id);
 
-  if (error) {
-    console.error('Supabase error:', error);
-    return res.status(500).json({ error: 'Erro ao excluir jogo' });
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({ error: 'Erro ao excluir jogo' });
+    }
+
+    res.json({ success: true, message: 'Jogo excluido' });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Erro interno' });
   }
+});
 
-  res.json({ success: true, message: 'Jogo excluido' });
+// Registra rotas em múltiplos caminhos
+app.use('/api/games', gamesRouter);
+app.use('/v1/api/games', gamesRouter);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Rota nao encontrada', path: req.path });
 });
 
 export default app;
